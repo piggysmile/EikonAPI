@@ -1,0 +1,45 @@
+# If stock tickers are known and saved as excel file, import the tickers as a list. 
+import xlrd
+wb = xlrd.open_workbook('ISIN_List.xls')
+# In python, numbering starts from 0.
+ws = wb.sheet_by_index(0)
+ISIN_list = ws.col_values(0)
+
+
+import eikon as ek
+import pandas as pd
+import numpy as np
+import datetime as datetime
+import time
+ek.set_app_key('7bb2f7df1f5c4b878213a1c9bffee54f3a2fe9c5')
+# It's better to save longer timeout in case your internet is not stable and the Eikon cuts you off.
+ek.set_timeout(300)
+
+#split them into a group of 'isin_per_call' into array_isin_list
+isin_per_call = 50
+array_isin_list = []
+i = 0
+while i < len(ISIN_list)/isin_per_call:
+    array_isin_list.append(ISIN_list[i*isin_per_call:(i+1)*isin_per_call])
+    i += 1
+# Define an empty dataframe first
+df=pd.DataFrame()
+#loop API call between groups of ISIN
+for isin in array_isin_list:
+    print("API calls for:",isin)
+    instruments=isin
+    fields=['TR.ISOriginalAnnouncementDate','TR.ISPeriodEndDate.fpa','TR.DilutedNormalizedEps(ReportingState=Orig).Date','TR.DilutedNormalizedEps(ReportingState=Orig)','TR.DilutedEpsExclExtra(ReportingState=Orig)','TR.DilutedEpsInclExtra(ReportingState=Orig)']
+    parameters1={'SDate':'1998-1-1','EDate':'2002-12-31','FRQ': 'FQ','Period':'FQ0'}
+    parameters2={'SDate':'2003-1-1','EDate':'2007-12-31','FRQ': 'FQ','Period':'FQ0'}
+    parameters3={'SDate':'2008-1-1','EDate':'2012-12-31','FRQ': 'FQ','Period':'FQ0'}
+    parameters4={'SDate':'2013-1-1','EDate':'2018-12-31','FRQ': 'FQ','Period':'FQ0'}
+    paralist=[parameters1,parameters2,parameters3,parameters4]
+    for i in paralist:
+        df1,err = ek.get_data(instruments,fields,i)
+        df1=df1.drop(df1.index[0])
+        df=df.append(df1)
+# set sleep time in case too many requests within a certain time hit the limit
+time.sleep(5)
+# convert dataframe to stata file
+df.to_stata('EPS_Income.dta')
+    
